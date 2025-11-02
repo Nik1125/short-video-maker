@@ -31,13 +31,19 @@ export type Scene = {
 };
 
 export const sceneInput = z.object({
-  text: z.string().describe("Text to be spoken in the video"),
+  text: z.string().optional().describe("Text to be spoken in the video (optional if customAudioUrl is provided)"),
   searchTerms: z
     .array(z.string())
     .describe(
       "Search term for video, 1 word, and at least 2-3 search terms should be provided for each scene. Make sure to match the overall context with the word - regardless what the video search result would be.",
     ),
-});
+  customAudioUrl: z.string().optional().describe("URL to custom audio file for narration (optional if text is provided). Supported formats: MP3, WAV"),
+}).refine(
+  (data) => data.text !== undefined || data.customAudioUrl !== undefined,
+  {
+    message: "Either 'text' or 'customAudioUrl' must be provided",
+  }
+);
 export type SceneInput = z.infer<typeof sceneInput>;
 
 export enum VoiceEnum {
@@ -120,6 +126,15 @@ export const renderConfig = z.object({
 export type RenderConfig = z.infer<typeof renderConfig>;
 
 export type Voices = `${VoiceEnum}`;
+
+export type VoiceMetadata = {
+  id: string;
+  name: string;
+  gender: "male" | "female";
+  age: "young" | "adult" | "mature";
+  style: "professional" | "casual" | "dramatic" | "neutral";
+  description: string;
+};
 
 export type Video = {
   id: string;

@@ -100,6 +100,13 @@ export class APIRouter {
     });
 
     this.router.get(
+      "/voices-with-metadata",
+      (req: ExpressRequest, res: ExpressResponse) => {
+        res.status(200).json(this.shortCreator.ListVoicesWithMetadata());
+      },
+    );
+
+    this.router.get(
       "/short-videos",
       (req: ExpressRequest, res: ExpressResponse) => {
         const videos = this.shortCreator.listAllVideos();

@@ -35,6 +35,10 @@ export class Server {
       "/static",
       express.static(path.join(__dirname, "../../static")),
     );
+    this.app.use(
+      "/api/custom-audio",
+      express.static(config.customAudioDirPath),
+    );
 
     // Serve the React app for all other routes (must be last)
     this.app.get("*", (req: ExpressRequest, res: ExpressResponse) => {

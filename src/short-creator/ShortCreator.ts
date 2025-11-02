@@ -108,18 +108,6 @@ export class ShortCreator {
 
     let index = 0;
     for (const scene of inputScenes) {
-      const audio = await this.kokoro.generate(
-        scene.text,
-        config.voice ?? "af_heart",
-      );
-      let { audioLength } = audio;
-      const { audio: audioStream } = audio;
-
-      // add the paddingBack in seconds to the last scene
-      if (index + 1 === inputScenes.length && config.paddingBack) {
-        audioLength += config.paddingBack / 1000;
-      }
-
       const tempId = cuid();
       const tempWavFileName = `${tempId}.wav`;
       const tempMp3FileName = `${tempId}.mp3`;
@@ -133,10 +121,42 @@ export class ShortCreator {
       tempFiles.push(tempVideoPath);
       tempFiles.push(tempWavPath, tempMp3Path);
 
-      await this.ffmpeg.saveNormalizedAudio(audioStream, tempWavPath);
+      let audioLength: number;
+
+      // Handle custom audio or TTS
+      if (scene.customAudioUrl) {
+        // Custom audio provided - download and use it
+        logger.debug(`Using custom audio from ${scene.customAudioUrl}`);
+        await this.downloadCustomAudio(scene.customAudioUrl, tempWavPath);
+        
+        // Get audio duration from the downloaded file
+        audioLength = await this.ffmpeg.getAudioDuration(tempWavPath);
+        
+        // Convert to MP3 for Remotion
+        await this.ffmpeg.convertAudioToMp3(tempWavPath, tempMp3Path);
+      } else {
+        // Generate TTS audio
+        if (!scene.text) {
+          throw new Error("Either 'text' or 'customAudioUrl' must be provided for each scene");
+        }
+        const audio = await this.kokoro.generate(
+          scene.text,
+          config.voice ?? "af_heart",
+        );
+        audioLength = audio.audioLength;
+        const { audio: audioStream } = audio;
+
+        await this.ffmpeg.saveNormalizedAudio(audioStream, tempWavPath);
+        await this.ffmpeg.saveToMp3(audioStream, tempMp3Path);
+      }
+
+      // Generate captions from audio
       const captions = await this.whisper.CreateCaption(tempWavPath);
 
-      await this.ffmpeg.saveToMp3(audioStream, tempMp3Path);
+      // add the paddingBack in seconds to the last scene
+      if (index + 1 === inputScenes.length && config.paddingBack) {
+        audioLength += config.paddingBack / 1000;
+      }
       const video = await this.pexelsApi.findVideo(
         scene.searchTerms,
         audioLength,
@@ -254,6 +274,39 @@ export class ShortCreator {
     return Array.from(tags.values());
   }
 
+  private async downloadCustomAudio(audioUrl: string, outputPath: string): Promise<void> {
+    logger.debug(`Downloading custom audio from ${audioUrl}`);
+    
+    // Support both http and https
+    const client = audioUrl.startsWith('https') ? https : http;
+    
+    await new Promise<void>((resolve, reject) => {
+      const fileStream = fs.createWriteStream(outputPath);
+      client
+        .get(audioUrl, (response: http.IncomingMessage) => {
+          if (response.statusCode !== 200) {
+            reject(
+              new Error(`Failed to download audio: ${response.statusCode}`),
+            );
+            return;
+          }
+
+          response.pipe(fileStream);
+
+          fileStream.on("finish", () => {
+            fileStream.close();
+            logger.debug(`Audio downloaded successfully to ${outputPath}`);
+            resolve();
+          });
+        })
+        .on("error", (err: Error) => {
+          fs.unlink(outputPath, () => {}); // Delete the file if download failed
+          logger.error(err, "Error downloading audio:");
+          reject(err);
+        });
+    });
+  }
+
   public listAllVideos(): { id: string; status: VideoStatus }[] {
     const videos: { id: string; status: VideoStatus }[] = [];
 
@@ -293,5 +346,9 @@ export class ShortCreator {
 
   public ListAvailableVoices(): string[] {
     return this.kokoro.listAvailableVoices();
+  }
+
+  public ListVoicesWithMetadata() {
+    return this.kokoro.listVoicesWithMetadata();
   }
 }

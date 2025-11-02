@@ -415,6 +415,82 @@ curl --location 'localhost:3123/api/music-tags'
 ]
 ```
 
+### GET `/api/voices-with-metadata`
+
+Returns list of all available voices with detailed metadata including gender, age, style, and description.
+
+```bash
+curl --location 'localhost:3123/api/voices-with-metadata'
+```
+
+```json
+[
+    {
+        "id": "af_heart",
+        "name": "Heart",
+        "gender": "female",
+        "age": "adult",
+        "style": "neutral",
+        "description": "Warm and friendly female voice"
+    },
+    {
+        "id": "am_michael",
+        "name": "Michael",
+        "gender": "male",
+        "age": "adult",
+        "style": "professional",
+        "description": "Authoritative professional male voice"
+    }
+]
+```
+
+## Custom Audio Support
+
+You can use your own audio files instead of TTS-generated narration. Place your audio files in the custom audio directory and reference them by URL.
+
+### For NPM installation:
+- Default location: `~/.ai-agents-az-video-generator/custom-audio/`
+- URL format: `http://localhost:3123/api/custom-audio/your-file.mp3`
+
+### For Docker:
+Mount your custom audio directory:
+```yaml
+version: "3"
+
+services:
+  short-video-maker:
+    image: gyoridavid/short-video-maker:latest-tiny
+    environment:
+      - PEXELS_API_KEY=your_key
+    ports:
+      - "3123:3123"
+    volumes:
+      - ./videos:/app/data/videos
+      - ./custom-audio:/app/data/custom-audio  # Mount your audio folder
+```
+
+Then reference files as: `http://localhost:3123/api/custom-audio/your-file.mp3`
+
+### Usage in API
+
+```bash
+curl --location 'localhost:3123/api/short-video' \
+--header 'Content-Type: application/json' \
+--data '{
+    "scenes": [
+      {
+        "customAudioUrl": "http://localhost:3123/api/custom-audio/my-narration.mp3",
+        "searchTerms": ["ocean", "waves"]
+      }
+    ],
+    "config": {
+      "music": "chill"
+    }
+}'
+```
+
+**Note:** Either `text` or `customAudioUrl` must be provided for each scene. Supported audio formats: MP3, WAV.
+
 # Troubleshooting
 
 ## Docker

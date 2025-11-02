@@ -90,4 +90,41 @@ export class FFMpeg {
         });
     });
   }
+
+  async getAudioDuration(audioPath: string): Promise<number> {
+    return new Promise((resolve, reject) => {
+      ffmpeg.ffprobe(audioPath, (err, metadata) => {
+        if (err) {
+          logger.error(err, "Error getting audio duration");
+          reject(err);
+          return;
+        }
+        const duration = metadata.format.duration;
+        if (!duration) {
+          reject(new Error("Could not determine audio duration"));
+          return;
+        }
+        resolve(duration);
+      });
+    });
+  }
+
+  async convertAudioToMp3(inputPath: string, outputPath: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      ffmpeg(inputPath)
+        .audioCodec("libmp3lame")
+        .audioBitrate(128)
+        .audioChannels(2)
+        .toFormat("mp3")
+        .save(outputPath)
+        .on("end", () => {
+          logger.debug("Audio conversion to MP3 complete");
+          resolve(outputPath);
+        })
+        .on("error", (err) => {
+          logger.error(err, "Error converting audio to MP3");
+          reject(err);
+        });
+    });
+  }
 }

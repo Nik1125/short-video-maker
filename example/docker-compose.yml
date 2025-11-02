@@ -1,0 +1,55 @@
+services:
+  # твой текущий n8n с Alpine + media CLI
+  n8n:
+    build: .
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - N8N_EDITOR_BASE_URL=http://localhost:5678
+      - WEBHOOK_URL=http://localhost:5678
+      - GENERIC_TIMEZONE=Europe/Warsaw
+    volumes:
+      - "D:/n8n/n8n_docker_container:/home/node/.n8n"
+      - "D:/n8n/shared:/shared"   # общая папка для обмена (опционально)
+    depends_on:
+      - short-video-maker        # чтобы REST был доступен в воркфлоу
+
+  # новый сервис short-video-maker - ВАША ЛОКАЛЬНАЯ ВЕРСИЯ С КАСТОМНЫМ АУДИО
+  short-video-maker:
+    build:
+      context: ..  # на уровень выше от example/
+      dockerfile: main-cuda.Dockerfile
+    container_name: short-video-maker
+    restart: unless-stopped
+    ports:
+      - "3123:3123"
+    environment:
+      - LOG_LEVEL=info
+      - PEXELS_API_KEY=9NMkJXWiBz7ya1coGjEWyqIrqZLFzGq2QP9jQNTvVE1vdVFapInOjEhr
+    volumes:
+      - "D:/n8n/short-video-maker:/app/data/videos"      # готовые ролики
+      - "D:/n8n/custom-audio:/app/data/custom-audio"     # ← НОВОЕ! Папка с вашим аудио
+      - "D:/n8n/shared:/shared"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3123/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    gpus: all  # GPU для Whisper
+
+  # сервис рендера Remotion (как у тебя)
+  remotion-renderer:
+    build:
+      context: "D:/n8n/remotion"
+    container_name: remotion-renderer
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - "D:/n8n/remotion/remotion_project:/app"
+      - "D:/n8n/shared:/shared" # общая папка для обмена (опционально)
+    command: ["bash","-lc","sleep infinity"]
